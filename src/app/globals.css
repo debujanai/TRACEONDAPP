@@ -1,0 +1,225 @@
+@import "tailwindcss";
+
+/**
+* @license
+*
+* Font Family: Clash Grotesk
+* Designed by: Indian Type Foundry
+* URL: https://www.fontshare.com/fonts/clash-grotesk
+* © 2025 Indian Type Foundry
+*
+*/
+@font-face {
+  font-family: 'ClashGrotesk-Extralight';
+  src: url('/fonts/ClashGrotesk-Extralight.woff2') format('woff2'),
+       url('/fonts/ClashGrotesk-Extralight.woff') format('woff'),
+       url('/fonts/ClashGrotesk-Extralight.ttf') format('truetype');
+  font-weight: 200;
+  font-display: swap;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'ClashGrotesk-Light';
+  src: url('/fonts/ClashGrotesk-Light.woff2') format('woff2'),
+       url('/fonts/ClashGrotesk-Light.woff') format('woff'),
+       url('/fonts/ClashGrotesk-Light.ttf') format('truetype');
+  font-weight: 300;
+  font-display: swap;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'ClashGrotesk-Regular';
+  src: url('/fonts/ClashGrotesk-Regular.woff2') format('woff2'),
+       url('/fonts/ClashGrotesk-Regular.woff') format('woff'),
+       url('/fonts/ClashGrotesk-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-display: swap;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'ClashGrotesk-Medium';
+  src: url('/fonts/ClashGrotesk-Medium.woff2') format('woff2'),
+       url('/fonts/ClashGrotesk-Medium.woff') format('woff'),
+       url('/fonts/ClashGrotesk-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-display: swap;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'ClashGrotesk-Semibold';
+  src: url('/fonts/ClashGrotesk-Semibold.woff2') format('woff2'),
+       url('/fonts/ClashGrotesk-Semibold.woff') format('woff'),
+       url('/fonts/ClashGrotesk-Semibold.ttf') format('truetype');
+  font-weight: 600;
+  font-display: swap;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'ClashGrotesk-Bold';
+  src: url('/fonts/ClashGrotesk-Bold.woff2') format('woff2'),
+       url('/fonts/ClashGrotesk-Bold.woff') format('woff'),
+       url('/fonts/ClashGrotesk-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-display: swap;
+  font-style: normal;
+}
+/**
+* This is a variable font
+* You can control variable axes as shown below:
+* font-variation-settings: wght 700.0;
+*
+* available axes:
+* 'wght' (range from 200.0 to 700.0)
+*/
+@font-face {
+  font-family: 'ClashGrotesk-Variable';
+  src: url('/fonts/ClashGrotesk-Variable.woff2') format('woff2'),
+       url('/fonts/ClashGrotesk-Variable.woff') format('woff'),
+       url('/fonts/ClashGrotesk-Variable.ttf') format('truetype');
+  font-weight: 200 700;
+  font-display: swap;
+  font-style: normal;
+}
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  /* Default theme colors - will be overridden by ThemeContext */
+  --theme-accent: #7764ff;
+  --theme-accent-light: rgba(119, 100, 255, 0.2);
+  --theme-accent-medium: rgba(119, 100, 255, 0.4);
+  --theme-accent-dark: rgba(119, 100, 255, 0.6);
+  --theme-gradient: linear-gradient(to right, rgba(119, 100, 255, 0.2), rgba(100, 200, 255, 0.2));
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: 'ClashGrotesk-Light', sans-serif;
+  --font-mono: monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #000000;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: 'ClashGrotesk-Light', sans-serif;
+}
+
+/* Custom Typography Styles */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'ClashGrotesk-Regular', sans-serif;
+}
+
+.uppercase {
+  letter-spacing: 0.05em;
+}
+
+button, a {
+  font-family: 'ClashGrotesk-Light', sans-serif;
+}
+
+/* Custom utility classes */
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
+}
+
+/* For thin scrollbars when needed */
+.thin-scrollbar::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.thin-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Apply theme colors as CSS variables that can be used throughout the app */
+@layer base {
+  body {
+    @apply bg-black text-white;
+    background-image: 
+      radial-gradient(circle at 25% 25%, rgba(120, 100, 255, 0.1) 0%, transparent 35%),
+      radial-gradient(circle at 75% 75%, rgba(120, 100, 255, 0.05) 0%, transparent 35%);
+    background-size: 100% 100%;
+    background-position: 0 0;
+    background-repeat: no-repeat;
+  }
+  
+  /* Themed input focus styles */
+  input:focus, textarea:focus, select:focus {
+    @apply outline-none;
+    box-shadow: 0 0 0 2px var(--theme-accent-light);
+    border-color: var(--theme-accent-medium) !important;
+  }
+}
+
+/* Custom scrollbar styling */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  border: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Theme-specific utility classes */
+.theme-accent-bg {
+  background-color: var(--theme-accent-light);
+}
+
+.theme-button {
+  background: var(--theme-gradient);
+  box-shadow: 0 4px 12px var(--theme-accent-light);
+}
+
+.theme-border {
+  border-color: var(--theme-accent-medium);
+}
+
+.theme-text {
+  color: var(--theme-accent);
+}
+
+.theme-gradient-text {
+  background: linear-gradient(to right, #fff, var(--theme-accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}

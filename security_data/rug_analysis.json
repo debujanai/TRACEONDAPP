@@ -1,0 +1,33 @@
+{
+    "code": 0,
+    "reason": "",
+    "message": "success",
+    "data": {
+        "address": "0x724fed0af661ec86b6174da7f17a5845777cb08c",
+        "link": {
+            "address": "0x724fed0af661ec86b6174da7f17a5845777cb08c",
+            "gmgn": "https://gmgn.ai/eth/token/0x724fed0af661ec86b6174da7f17a5845777cb08c",
+            "geckoterminal": "https://www.geckoterminal.com/eth/tokens/0x724fed0af661ec86b6174da7f17a5845777cb08c",
+            "twitter_username": "nujak_eth",
+            "website": "https://www.nujak.vip/",
+            "telegram": "https://t.me/Nujak_Eth",
+            "bitbucket": "",
+            "discord": "",
+            "description": "Nujak -  The new Wojak",
+            "facebook": "",
+            "github": "",
+            "instagram": "",
+            "linkedin": "",
+            "medium": "",
+            "reddit": "",
+            "tiktok": "",
+            "youtube": "",
+            "verify_status": 0
+        },
+        "rug": null,
+        "vote": {
+            "like": 0,
+            "unlike": 0
+        }
+    }
+}

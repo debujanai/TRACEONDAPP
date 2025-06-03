@@ -11,7 +11,7 @@ const ProductCarousel = () => {
   // Agent showcase data
   const agents = [
     {
-      id: "comingsoon",
+      id: "codereveal",
       title: "CodeReveal",
       category: "Blockchain Security",
       description: "Analyze token security risks, detect vulnerabilities, and assess overall risk level with our AI-powered security analyzer. Our comprehensive scanning tools help identify potential exploits, backdoors, and risky code patterns before they can be exploited.",
@@ -39,7 +39,7 @@ const ProductCarousel = () => {
       )
     },
     {
-      id: "comingsoon",
+      id: "rugtrace",
       title: "RugTrace",
       category: "Advanced Analytics",
       description: "Advanced token investigation tools to trace developer history, analyze transaction patterns, and detect suspicious activity. Our powerful analytics engine provides deep insights into token holder distribution, liquidity patterns, and historical price movements.",

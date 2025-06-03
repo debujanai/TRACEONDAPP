@@ -38,6 +38,9 @@ contract {{TOKEN_NAME}} is ERC20{{INHERITANCE}} {
     uint256 public sellTax;
     address public taxWallet;
     
+    // Router addresses for tax detection
+    mapping(address => bool) public isRouter;
+    
     constructor(
         string memory name_,
         string memory symbol_,
@@ -52,12 +55,17 @@ contract {{TOKEN_NAME}} is ERC20{{INHERITANCE}} {
         _decimals = decimals_;
         {{CONSTRUCTOR_BODY}}
         
-        // Set tax settings - taxes in basis points (1% = 100)
-        // The actual tax percentage will be calculated as: tax / 10000
-        // Example: 500 basis points (5%) ÷ 10000 = 0.05 (5%)
-        buyTax = buyTax_;
-        sellTax = sellTax_;
+        // Initialize taxes to 0 - will be set in separate transactions after deployment
+        buyTax = 0;
+        sellTax = 0;
         taxWallet = msg.sender;
+        
+        // Add known router addresses for tax detection
+        isRouter[address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2)] = true; // WETH
+        isRouter[address(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D)] = true; // Uniswap V2 Router
+        isRouter[address(0xE592427A0AEce92De3Edee1F18E0157C05861564)] = true; // Uniswap V3 Router
+        isRouter[address(0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270)] = true; // WMATIC
+        isRouter[address(0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff)] = true; // QuickSwap Router
         
         _mint(msg.sender, initialSupply_ * 10 ** decimals_);
     }
@@ -80,22 +88,14 @@ contract {{TOKEN_NAME}} is ERC20{{INHERITANCE}} {
         
         uint256 taxAmount = 0;
         
-        // Apply buy tax when transferring to non-excluded addresses
-        if (from == address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2) || // WETH
-            from == address(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D) || // Uniswap V2 Router
-            from == address(0xE592427A0AEce92De3Edee1F18E0157C05861564) || // Uniswap V3 Router
-            from == address(0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270) || // WMATIC
-            from == address(0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff)) { // QuickSwap Router
+        // Apply buy tax when buying from a router (router -> user)
+        if (isRouter[from]) {
             // Tax calculation: 1% = 100 basis points, divided by 10000 to get the actual percentage
             // Example: 500 basis points (5%) ÷ 10000 = 0.05 (5%)
             taxAmount = amount * buyTax / 10000;
         }
-        // Apply sell tax when transferring to router addresses
-        else if (to == address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2) || // WETH
-                 to == address(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D) || // Uniswap V2 Router
-                 to == address(0xE592427A0AEce92De3Edee1F18E0157C05861564) || // Uniswap V3 Router
-                 to == address(0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270) || // WMATIC
-                 to == address(0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff)) { // QuickSwap Router
+        // Apply sell tax when selling to a router (user -> router)
+        else if (isRouter[to]) {
             // Tax calculation: 1% = 100 basis points, divided by 10000 to get the actual percentage
             // Example: 500 basis points (5%) ÷ 10000 = 0.05 (5%)
             taxAmount = amount * sellTax / 10000;
@@ -110,10 +110,24 @@ contract {{TOKEN_NAME}} is ERC20{{INHERITANCE}} {
         }
     }
     
-    // Function to update tax settings
+    // Function to set buy tax - separate transaction after deployment
+    function setBuyTax(uint256 newBuyTax) public {
+        require(msg.sender == taxWallet, "Only tax wallet can update taxes");
+        require(newBuyTax <= 5000, "Tax cannot exceed 50%");
+        buyTax = newBuyTax;
+    }
+    
+    // Function to set sell tax - separate transaction after deployment
+    function setSellTax(uint256 newSellTax) public {
+        require(msg.sender == taxWallet, "Only tax wallet can update taxes");
+        require(newSellTax <= 5000, "Tax cannot exceed 50%");
+        sellTax = newSellTax;
+    }
+    
+    // Function to update tax settings - combined function
     function setTaxes(uint256 newBuyTax, uint256 newSellTax) public {
         require(msg.sender == taxWallet, "Only tax wallet can update taxes");
-        require(newBuyTax <= 1000 && newSellTax <= 1000, "Tax cannot exceed 10%");
+        require(newBuyTax <= 5000 && newSellTax <= 5000, "Tax cannot exceed 50%");
         buyTax = newBuyTax;
         sellTax = newSellTax;
     }
@@ -123,6 +137,12 @@ contract {{TOKEN_NAME}} is ERC20{{INHERITANCE}} {
         require(msg.sender == taxWallet, "Only current tax wallet can update");
         require(newTaxWallet != address(0), "Cannot set to zero address");
         taxWallet = newTaxWallet;
+    }
+    
+    // Function to add or remove router addresses
+    function setRouter(address router, bool isActive) public {
+        require(msg.sender == taxWallet, "Only tax wallet can update routers");
+        isRouter[router] = isActive;
     }
     
     {{FUNCTIONS}}

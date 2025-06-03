@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useRef, ReactNode } from 'react';
@@ -367,16 +366,16 @@ const tabs: TabProps[] = [
         <path d="M6 20v-4"></path>
       </svg>
     )
-  // },
-  // {
-  //   name: 'liquiditylock',
-  //   label: 'Lock LP',
-  //   icon: (
-  //     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-  //       <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-  //       <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-  //     </svg>
-  //   )
+  },
+  {
+    name: 'liquiditylock',
+    label: 'Lock LP',
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+      </svg>
+    )
   }
 ];
 
@@ -771,23 +770,27 @@ export default function ContractDeploy() {
         ethers.parseUnits(contractDetails.totalSupply, 0) // Use 0 for decimals here to avoid over-multiplication
       ];
       
+      // Convert tax values to basis points (1% = 100 basis points)
+      const buyTaxBasisPoints = Math.floor(contractDetails.buyTax * 100);
+      const sellTaxBasisPoints = Math.floor(contractDetails.sellTax * 100);
+      
       // Add tax parameters if the constructor accepts them
       let deployArgs = baseArgs;
       if (constructorParams.length >= 6) {
-        // Contract expects tax parameters
+        // Contract expects tax parameters - we'll pass 0 for now and set them later
         deployArgs = [
           ...baseArgs,
-          Math.floor(contractDetails.buyTax * 100), // Convert percentage to basis points (1% = 100 basis points)
-          Math.floor(contractDetails.sellTax * 100)  // Convert percentage to basis points (1% = 100 basis points)
+          0, // Initial buyTax is 0, will be set in a separate transaction
+          0  // Initial sellTax is 0, will be set in a separate transaction
         ];
       }
       
       console.log('Deploying contract with arguments:', deployArgs);
-      console.log('Tax settings:', {
+      console.log('Tax settings to be applied after deployment:', {
         buyTax: contractDetails.buyTax,
         sellTax: contractDetails.sellTax,
-        convertedBuyTax: Math.floor(contractDetails.buyTax * 100),
-        convertedSellTax: Math.floor(contractDetails.sellTax * 100)
+        convertedBuyTax: buyTaxBasisPoints,
+        convertedSellTax: sellTaxBasisPoints
       });
       
       // Deploy contract with constructor arguments
@@ -811,6 +814,53 @@ export default function ContractDeploy() {
       // Get deployed contract address
       const deployedAddress = await contract.getAddress();
       console.log('Deployed at address:', deployedAddress);
+
+      // Create a contract instance with the deployed address
+      const deployedContract = new ethers.Contract(
+        deployedAddress,
+        deploymentResult.abi,
+        signer
+      );
+
+      // Set buy tax in a separate transaction if needed
+      if (buyTaxBasisPoints > 0) {
+        console.log(`Setting buy tax to ${buyTaxBasisPoints} basis points...`);
+        const setBuyTaxTx = await deployedContract.setBuyTax(buyTaxBasisPoints);
+        const buyTaxReceipt = await setBuyTaxTx.wait();
+        console.log('Buy tax set successfully:', buyTaxReceipt.hash);
+      }
+
+      // Set sell tax in a separate transaction if needed
+      if (sellTaxBasisPoints > 0) {
+        console.log(`Setting sell tax to ${sellTaxBasisPoints} basis points...`);
+        const setSellTaxTx = await deployedContract.setSellTax(sellTaxBasisPoints);
+        const sellTaxReceipt = await setSellTaxTx.wait();
+        console.log('Sell tax set successfully:', sellTaxReceipt.hash);
+      }
+
+      // Verify tax settings are correctly set
+      try {
+        const verifiedBuyTax = await deployedContract.buyTax();
+        const verifiedSellTax = await deployedContract.sellTax();
+        const taxWallet = await deployedContract.taxWallet();
+        
+        console.log('Tax verification:', {
+          buyTax: {
+            expected: buyTaxBasisPoints,
+            actual: Number(verifiedBuyTax),
+            match: Number(verifiedBuyTax) === buyTaxBasisPoints
+          },
+          sellTax: {
+            expected: sellTaxBasisPoints,
+            actual: Number(verifiedSellTax),
+            match: Number(verifiedSellTax) === sellTaxBasisPoints
+          },
+          taxWallet,
+          taxWalletIsDeployer: taxWallet.toLowerCase() === (await signer.getAddress()).toLowerCase()
+        });
+      } catch (verifyError) {
+        console.error('Error verifying tax settings:', verifyError);
+      }
 
       // Properly encode constructor arguments
       const contractInterface = new ethers.Interface(deploymentResult.abi);
@@ -2498,15 +2548,15 @@ export default function ContractDeploy() {
                           <input
                             type="range"
                             min="0"
-                            max="10"
-                            step="0.1"
+                            max="50"
+                            step="0.5"
                             value={contractDetails.buyTax}
                             onChange={(e) => setContractDetails({...contractDetails, buyTax: parseFloat(e.target.value)})}
                             className="w-full h-1 bg-purple-500/20 rounded-lg appearance-none cursor-pointer accent-purple-500"
                           />
                           <div className="flex justify-between mt-1 text-xs text-white/60">
                             <span>0%</span>
-                            <span>10%</span>
+                            <span>50%</span>
                           </div>
                         </div>
                         <div>
@@ -2514,15 +2564,15 @@ export default function ContractDeploy() {
                           <input
                             type="range"
                             min="0"
-                            max="10"
-                            step="0.1"
+                            max="50"
+                            step="0.5"
                             value={contractDetails.sellTax}
                             onChange={(e) => setContractDetails({...contractDetails, sellTax: parseFloat(e.target.value)})}
                             className="w-full h-1 bg-purple-500/20 rounded-lg appearance-none cursor-pointer accent-purple-500"
                           />
                           <div className="flex justify-between mt-1 text-xs text-white/60">
                             <span>0%</span>
-                            <span>10%</span>
+                            <span>50%</span>
                           </div>
                         </div>
                       </div>
@@ -2628,6 +2678,11 @@ export default function ContractDeploy() {
                               <p className="font-medium">{contractDetails.sellTax}% ({Math.floor(contractDetails.sellTax * 100)} basis points)</p>
                               <p className="text-xs text-white/60 mt-1">Contract value: {Math.floor(contractDetails.sellTax * 100)}</p>
                             </div>
+                          </div>
+                          <div className="mt-3 text-xs text-amber-400">
+                            <p>• Taxes are automatically applied on buys and sells through DEX routers</p>
+                            <p>• Tax collected is sent to the contract owner (taxWallet)</p>
+                            <p>• Owner can update tax rates and tax wallet through contract functions</p>
                           </div>
                         </div>
                       )}
@@ -3445,6 +3500,24 @@ export default function ContractDeploy() {
                     <p className="text-sm text-white/60 mb-1">Transaction Hash</p>
                     <p className="font-mono text-sm break-all">{deployedContract?.txHash}</p>
                   </div>
+                  
+                  {(contractDetails.buyTax > 0 || contractDetails.sellTax > 0) && (
+                    <div className="bg-black/30 p-4 rounded-lg border border-amber-500/20">
+                      <p className="text-sm text-white/60 mb-1">Tax Settings</p>
+                      <div className="grid grid-cols-2 gap-4 mt-2">
+                        <div>
+                          <p className="text-xs text-amber-400">Buy Tax</p>
+                          <p className="font-mono text-sm">{contractDetails.buyTax}% ({Math.floor(contractDetails.buyTax * 100)} basis points)</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-amber-400">Sell Tax</p>
+                          <p className="font-mono text-sm">{contractDetails.sellTax}% ({Math.floor(contractDetails.sellTax * 100)} basis points)</p>
+                        </div>
+                      </div>
+                      <p className="text-xs mt-2 text-white/60">Taxes are automatically applied on DEX trades and sent to the contract owner.</p>
+                      <p className="text-xs mt-1 text-white/60">Tax rates were set in separate transactions after deployment.</p>
+                    </div>
+                  )}
                   
                   <div className="bg-black/30 p-4 rounded-lg border border-white/10">
                     <div className="flex justify-between">

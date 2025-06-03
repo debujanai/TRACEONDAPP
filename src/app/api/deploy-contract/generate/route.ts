@@ -27,9 +27,10 @@ const CONTRACT_TEMPLATE = `// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 {{IMPORTS}}
 
-contract {{TOKEN_NAME}} is ERC20{{INHERITANCE}} {
+contract {{TOKEN_NAME}} is ERC20, Ownable{{INHERITANCE}} {
     uint8 private immutable _decimals;
     {{VARIABLES}}
     
@@ -50,6 +51,7 @@ contract {{TOKEN_NAME}} is ERC20{{INHERITANCE}} {
         uint256 sellTax_
     ) 
         ERC20(name_, symbol_)
+        Ownable()
         {{CONSTRUCTOR_INITIALIZERS}}
     {
         _decimals = decimals_;
@@ -111,37 +113,32 @@ contract {{TOKEN_NAME}} is ERC20{{INHERITANCE}} {
     }
     
     // Function to set buy tax - separate transaction after deployment
-    function setBuyTax(uint256 newBuyTax) public {
-        require(msg.sender == taxWallet, "Only tax wallet can update taxes");
+    function setBuyTax(uint256 newBuyTax) public onlyOwner {
         require(newBuyTax <= 5000, "Tax cannot exceed 50%");
         buyTax = newBuyTax;
     }
     
     // Function to set sell tax - separate transaction after deployment
-    function setSellTax(uint256 newSellTax) public {
-        require(msg.sender == taxWallet, "Only tax wallet can update taxes");
+    function setSellTax(uint256 newSellTax) public onlyOwner {
         require(newSellTax <= 5000, "Tax cannot exceed 50%");
         sellTax = newSellTax;
     }
     
     // Function to update tax settings - combined function
-    function setTaxes(uint256 newBuyTax, uint256 newSellTax) public {
-        require(msg.sender == taxWallet, "Only tax wallet can update taxes");
+    function setTaxes(uint256 newBuyTax, uint256 newSellTax) public onlyOwner {
         require(newBuyTax <= 5000 && newSellTax <= 5000, "Tax cannot exceed 50%");
         buyTax = newBuyTax;
         sellTax = newSellTax;
     }
     
     // Function to update tax wallet
-    function setTaxWallet(address newTaxWallet) public {
-        require(msg.sender == taxWallet, "Only current tax wallet can update");
+    function setTaxWallet(address newTaxWallet) public onlyOwner {
         require(newTaxWallet != address(0), "Cannot set to zero address");
         taxWallet = newTaxWallet;
     }
     
     // Function to add or remove router addresses
-    function setRouter(address router, bool isActive) public {
-        require(msg.sender == taxWallet, "Only tax wallet can update routers");
+    function setRouter(address router, bool isActive) public onlyOwner {
         isRouter[router] = isActive;
     }
     
@@ -151,8 +148,8 @@ contract {{TOKEN_NAME}} is ERC20{{INHERITANCE}} {
 // Feature imports and implementations
 const FEATURE_TEMPLATES = {
   Mintable: {
-    imports: ['import "@openzeppelin/contracts/access/Ownable.sol";'],
-    inheritance: ', Ownable',
+    imports: [],
+    inheritance: '',
     variables: '',
     constructorBody: '',
     functions: `
@@ -168,8 +165,8 @@ const FEATURE_TEMPLATES = {
     functions: '',
   },
   Pausable: {
-    imports: ['import "@openzeppelin/contracts/security/Pausable.sol";', 'import "@openzeppelin/contracts/access/Ownable.sol";'],
-    inheritance: ', Pausable, Ownable',
+    imports: ['import "@openzeppelin/contracts/security/Pausable.sol";'],
+    inheritance: ', Pausable',
     variables: '',
     constructorBody: '',
     functions: `

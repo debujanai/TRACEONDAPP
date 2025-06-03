@@ -82,8 +82,8 @@
 }
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #000000;
+  --foreground: #ededed;
   /* Default theme colors - will be overridden by ThemeContext */
   --theme-accent: #7764ff;
   --theme-accent-light: rgba(119, 100, 255, 0.2);
@@ -99,10 +99,10 @@
   --font-mono: monospace;
 }
 
-@media (prefers-color-scheme: dark) {
+@media (prefers-color-scheme: light) {
   :root {
-    --background: #000000;
-    --foreground: #ededed;
+    --background: #ffffff;
+    --foreground: #171717;
   }
 }
 

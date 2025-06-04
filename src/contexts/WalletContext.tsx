@@ -130,7 +130,8 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       
       if (!profile) {
         console.error("Could not fetch or create profile");
-        setDbConnectionError(true);
+        // Only set database connection error if there was an actual error
+        // Not when it's just a new user
         setIsNewUser(true);
         setShowLoginModal(true);
         return null;
@@ -142,6 +143,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       }
     } catch (error) {
       console.error("Error fetching profile:", error);
+      // Only set database connection error for actual errors
       setDbConnectionError(true);
       return null;
     }

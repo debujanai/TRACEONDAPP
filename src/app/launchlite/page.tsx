@@ -25,7 +25,8 @@ const POSITION_MANAGER_ABI = [
   "function positions(uint256 tokenId) external view returns (uint96 nonce, address operator, address token0, address token1, uint24 fee, int24 tickLower, int24 tickUpper, uint128 liquidity, uint256 feeGrowthInside0LastX128, uint256 feeGrowthInside1LastX128, uint128 tokensOwed0, uint128 tokensOwed1)",
   "function mint(tuple(address token0, address token1, uint24 fee, int24 tickLower, int24 tickUpper, uint256 amount0Desired, uint256 amount1Desired, uint256 amount0Min, uint256 amount1Min, address recipient, uint256 deadline)) external payable returns (uint256 tokenId, uint128 liquidity, uint256 amount0, uint256 amount1)",
   "function createAndInitializePoolIfNecessary(address token0, address token1, uint24 fee, uint160 sqrtPriceX96) external payable returns (address pool)",
-  "function WETH9() external view returns (address)"
+  "function WETH9() external view returns (address)",
+  "function multicall(bytes[] calldata data) external payable returns (bytes[] memory)"
 ];
 
 // Add Uniswap V3 Pool interface
@@ -1168,16 +1169,18 @@ export default function ContractDeploy() {
             token1 = WETH9;
             amount0Desired = tokenAmount;
             amount1Desired = nativeAmount;
-            amount0Min = tokenAmount * BigInt(slippageFactor) / BigInt(1000);
-            amount1Min = nativeAmount * BigInt(slippageFactor) / BigInt(1000);
+            // Following the Solidity contract example, set minimums to 0 for initial transaction
+            amount0Min = BigInt(0);
+            amount1Min = BigInt(0);
             ethValue = nativeAmount; // ETH value to send
           } else {
             token0 = WETH9;
             token1 = tokenAddress!;
             amount0Desired = nativeAmount;
             amount1Desired = tokenAmount;
-            amount0Min = nativeAmount * BigInt(slippageFactor) / BigInt(1000);
-            amount1Min = tokenAmount * BigInt(slippageFactor) / BigInt(1000);
+            // Following the Solidity contract example, set minimums to 0 for initial transaction
+            amount0Min = BigInt(0);
+            amount1Min = BigInt(0);
             ethValue = nativeAmount; // ETH value to send
           }
           
@@ -1212,15 +1215,17 @@ export default function ContractDeploy() {
             token1 = pairToken.address;
             amount0Desired = tokenAmount;
             amount1Desired = pairTokenAmount;
-            amount0Min = tokenAmount * BigInt(slippageFactor) / BigInt(1000);
-            amount1Min = pairTokenAmount * BigInt(slippageFactor) / BigInt(1000);
+            // Following the Solidity contract example, set minimums to 0 for initial transaction
+            amount0Min = BigInt(0);
+            amount1Min = BigInt(0);
           } else {
             token0 = pairToken.address;
             token1 = tokenAddress!;
             amount0Desired = pairTokenAmount;
             amount1Desired = tokenAmount;
-            amount0Min = pairTokenAmount * BigInt(slippageFactor) / BigInt(1000);
-            amount1Min = tokenAmount * BigInt(slippageFactor) / BigInt(1000);
+            // Following the Solidity contract example, set minimums to 0 for initial transaction
+            amount0Min = BigInt(0);
+            amount1Min = BigInt(0);
           }
           
           // Check existing allowances before approving
@@ -1258,136 +1263,286 @@ export default function ContractDeploy() {
         // Use the selected fee tier or default to 0.3%
         const fee = liquidityDetails.feeTier || 3000;
         
-        // Calculate ticks according to fee tier
-        const { minTick, maxTick } = calculateTicks(fee);
-        
         // Check if pool exists
-        let poolAddress = await factory.getPool(token0, token1, fee).catch(() => null);
-        let poolAlreadyInitialized = false;
+        const poolAddress = await factory.getPool(token0, token1, fee).catch(() => null);
         console.log(`Pool exists: ${!!poolAddress && poolAddress !== ethers.ZeroAddress}, address: ${poolAddress || 'none'}`);
         
-        // If pool exists, check if it's initialized
-        if (poolAddress && poolAddress !== ethers.ZeroAddress) {
-          try {
-            const pool = new ethers.Contract(poolAddress, POOL_ABI, signer);
-            const [sqrtPriceX96] = await pool.slot0();
-            if (sqrtPriceX96 > 0) {
-              poolAlreadyInitialized = true;
-              console.log('Pool is already initialized with price:', sqrtPriceX96.toString());
-              setLiquidityTxStatus(prev => ({...prev, poolCreation: 'skipped'}));
-            }
-          } catch (err) {
-            console.log('Pool exists but may not be initialized:', err);
-            poolAlreadyInitialized = false;
+        try {
+          // Set position minting as pending
+          setLiquidityTxStatus(prev => ({...prev, positionMinting: 'pending'}));
+          
+          // Use multicall pattern like Uniswap V3 UI does
+          const calldata = [];
+          
+          // IMPORTANT: Make sure we have the tokens in the correct order
+          // Uniswap V3 requires token0 and token1 to be in address sort order
+          if (token0.toLowerCase() > token1.toLowerCase()) {
+            throw new Error('Tokens must be sorted by address in ascending order');
           }
-        }
-        
-        // If pool doesn't exist or isn't initialized, create and initialize it
-        if (!poolAlreadyInitialized) {
-          setLiquidityTxStatus(prev => ({...prev, poolCreation: 'pending'}));
-          console.log('Pool needs to be created or initialized...');
-          try {
-            // Calculate initial price (roughly based on token amounts)
-            const priceRatio = Number(amount1Desired) / Number(amount0Desired);
-            const sqrtPriceX96 = calculateSqrtPriceX96(priceRatio);
-            console.log(`Initial price ratio: ${priceRatio}, sqrtPriceX96: ${sqrtPriceX96.toString()}`);
+          
+          // For full range positions, use TickMath MIN_TICK and MAX_TICK constants
+          // This is exactly what Uniswap contract uses
+          const tickSpacing = getTickSpacing(fee);
+          const minTickAdjusted = Math.ceil(TickMath.MIN_TICK / tickSpacing) * tickSpacing;
+          const maxTickAdjusted = Math.floor(TickMath.MAX_TICK / tickSpacing) * tickSpacing;
+          
+          console.log('Adjusted ticks for full range:', {
+            minTickAdjusted,
+            maxTickAdjusted,
+            tickSpacing
+          });
+          
+          // If pool doesn't exist, create and initialize it
+          if (!poolAddress || poolAddress === ethers.ZeroAddress) {
+            console.log('Pool does not exist, will create and initialize...');
             
-            // Create and initialize the pool in one call
-            const initTx = await positionManager.createAndInitializePoolIfNecessary(
+            // Use a more precise price calculation approach based on the contract
+            // The price should be the ratio between token1 and token0 amounts
+            let sqrtPriceX96;
+            
+            // Calculate the price based on the amounts
+            // Price = token1/token0 (in wei amounts)
+            if (amount1Desired > BigInt(0) && amount0Desired > BigInt(0)) {
+              // Convert the price to square root X96 format using the same technique as Uniswap
+              const price = Number(amount1Desired) / Number(amount0Desired);
+              sqrtPriceX96 = calculateSqrtPriceX96(price);
+            } else if (amount0Desired > BigInt(0)) {
+              // If only token0 is provided, use a very low price
+              sqrtPriceX96 = calculateSqrtPriceX96(0.00001);
+            } else if (amount1Desired > BigInt(0)) {
+              // If only token1 is provided, use a very high price
+              sqrtPriceX96 = calculateSqrtPriceX96(100000);
+            } else {
+              // Default price (1:1)
+              sqrtPriceX96 = calculateSqrtPriceX96(1);
+            }
+            
+            console.log('Creating pool with sqrtPriceX96:', sqrtPriceX96.toString());
+            
+            // First create and initialize the pool
+            const createAndInitializePoolData = positionManager.interface.encodeFunctionData(
+              'createAndInitializePoolIfNecessary',
+              [token0, token1, fee, sqrtPriceX96]
+            );
+            calldata.push(createAndInitializePoolData);
+          }
+          
+          // Deadline 20 minutes from now
+          const deadline = Math.floor(Date.now() / 1000) + 20 * 60;
+          
+          // Prepare mint parameters
+          const recipient = await signer.getAddress();
+          
+          // Add mint call with proper parameters
+          const mintParams = {
+            token0,
+            token1, 
+            fee,
+            tickLower: minTickAdjusted,
+            tickUpper: maxTickAdjusted,
+            amount0Desired,
+            amount1Desired,
+            amount0Min, // Following the Solidity contract example
+            amount1Min, // Following the Solidity contract example
+            recipient,
+            deadline
+          };
+          
+          console.log('Mint params:', {
+            token0,
+            token1,
+            fee,
+            tickLower: minTickAdjusted,
+            tickUpper: maxTickAdjusted,
+            amount0Desired: amount0Desired.toString(),
+            amount1Desired: amount1Desired.toString(),
+            amount0Min: amount0Min.toString(),
+            amount1Min: amount1Min.toString(),
+            recipient,
+            deadline
+          });
+          
+          const mintData = positionManager.interface.encodeFunctionData('mint', [mintParams]);
+          calldata.push(mintData);
+          
+          // Execute multicall
+          console.log('Executing multicall with', calldata.length, 'functions');
+          const txOptions = {
+            value: ethValue,
+            gasLimit: 15000000, // Increase gas limit even more for safety
+          };
+          
+          console.log('Transaction options:', {
+            value: ethValue.toString(),
+            gasLimit: txOptions.gasLimit.toString()
+          });
+          
+          const tx = await positionManager.multicall(calldata, txOptions);
+          addLiquidityTx = tx;
+          
+          console.log('Multicall transaction sent:', addLiquidityTx.hash);
+          
+          // Wait for the transaction receipt to ensure it's successful
+          console.log('Waiting for transaction confirmation...');
+          const receipt = await tx.wait();
+          console.log('Transaction confirmed, status:', receipt.status);
+          
+          if (receipt.status === 0) {
+            throw new Error('Transaction failed');
+          }
+          
+          // Look for IncreaseLiquidity event to extract the position ID
+          if (receipt.logs) {
+            for (const log of receipt.logs) {
+              try {
+                // Try to find the Transfer event from NonfungiblePositionManager for the newly minted position
+                if (log.address.toLowerCase() === positionManagerAddress.toLowerCase()) {
+                  const transferEventTopic = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'; // Transfer event topic
+                  if (log.topics[0].toLowerCase() === transferEventTopic && log.topics[1].toLowerCase() === '0x0000000000000000000000000000000000000000000000000000000000000000') {
+                    // Found a Transfer from address 0, which is a mint event
+                    // topic[3] contains the tokenId
+                    const tokenId = ethers.toBigInt(log.topics[3]);
+                    console.log('Created position with ID:', tokenId.toString());
+                  }
+                }
+              } catch (err) {
+                console.error('Error parsing log:', err);
+              }
+            }
+          }
+          
+          setLiquidityTxStatus(prev => ({...prev, poolCreation: 'complete', positionMinting: 'complete'}));
+        } catch (err) {
+          console.error('Error in multicall operation:', err);
+          const mintErr = err as Error;
+          
+          if (mintErr.message && (mintErr.message.includes('tick') || mintErr.message.includes('liquidity'))) {
+            // Try with adjusted ticks
+            console.log('Retrying with exact full range...');
+            
+            // For retry, use TickMath.MIN_TICK and TickMath.MAX_TICK directly
+            const retryTickSpacing = getTickSpacing(fee);
+            const retryMinTick = Math.ceil(-887272 / retryTickSpacing) * retryTickSpacing;
+            const retryMaxTick = Math.floor(887272 / retryTickSpacing) * retryTickSpacing;
+            
+            console.log('Trying with exact full range:', {
+              retryMinTick,
+              retryMaxTick,
+              tickSpacing: retryTickSpacing
+            });
+            
+            const retryCalldata = [];
+            
+            // If pool doesn't exist, create and initialize it
+            if (!poolAddress || poolAddress === ethers.ZeroAddress) {
+              // Calculate price ratio based on ratio of token amounts with safeguards
+              let sqrtPriceX96;
+              if (amount1Desired > BigInt(0) && amount0Desired > BigInt(0)) {
+                const price = Number(amount1Desired) / Number(amount0Desired);
+                sqrtPriceX96 = calculateSqrtPriceX96(price);
+              } else {
+                // Default to 1:1 price for retry
+                sqrtPriceX96 = calculateSqrtPriceX96(1);
+              }
+              
+              console.log('Retrying pool creation with sqrtPriceX96:', sqrtPriceX96.toString());
+              
+              const createAndInitializePoolData = positionManager.interface.encodeFunctionData(
+                'createAndInitializePoolIfNecessary',
+                [token0, token1, fee, sqrtPriceX96]
+              );
+              retryCalldata.push(createAndInitializePoolData);
+            }
+            
+            // Deadline 20 minutes from now
+            const deadline = Math.floor(Date.now() / 1000) + 20 * 60;
+            
+            // Prepare mint parameters - use zero for min amounts
+            const recipient = await signer.getAddress();
+            
+            // Always set min amounts to 0 for the retry to match the Solidity contract example
+            const retryAmount0Min = BigInt(0);
+            const retryAmount1Min = BigInt(0);
+            
+            // Add mint call with wider ticks
+            const retryMintParams = {
               token0,
               token1,
               fee,
-              sqrtPriceX96,
-              { gasLimit: 5000000, value: liquidityDetails.pairType === 'native' ? ethers.parseEther("0.01") : BigInt(0) }
-            );
-            const initReceipt = await initTx.wait();
-            console.log('Pool initialized:', initReceipt.hash);
-            setLiquidityTxStatus(prev => ({...prev, poolCreation: 'complete'}));
+              tickLower: retryMinTick,
+              tickUpper: retryMaxTick,
+              amount0Desired,
+              amount1Desired,
+              amount0Min: retryAmount0Min,
+              amount1Min: retryAmount1Min,
+              recipient,
+              deadline
+            };
             
-            // Get the pool address
-            poolAddress = await factory.getPool(token0, token1, fee);
-            console.log('Pool created at address:', poolAddress);
-          } catch (err) {
-            console.error('Error creating pool:', err);
-            // Check if pool was actually created despite error
-            poolAddress = await factory.getPool(token0, token1, fee);
-            if (!poolAddress || poolAddress === ethers.ZeroAddress) {
-              throw new Error('Failed to create liquidity pool');
-            }
-            console.log('Pool exists despite error, continuing with mint...');
-          }
-        }
-
-        // Deadline 20 minutes from now
-        const deadline = Math.floor(Date.now() / 1000) + 20 * 60;
-        
-        console.log(`Adding Uniswap V3 liquidity with params:`, {
-          token0,
-          token1,
-          fee,
-          tickLower: minTick,
-          tickUpper: maxTick,
-          amount0Desired: amount0Desired.toString(),
-          amount1Desired: amount1Desired.toString(),
-          amount0Min: amount0Min.toString(),
-          amount1Min: amount1Min.toString(),
-          recipient: await signer.getAddress(),
-          deadline
-        });
-        
-        // Prepare mint parameters
-        const mintParams = {
-          token0,
-          token1,
-          fee,
-          tickLower: minTick,
-          tickUpper: maxTick,
-          amount0Desired,
-          amount1Desired,
-          amount0Min,
-          amount1Min,
-          recipient: await signer.getAddress(),
-          deadline
-        };
-        
-        try {
-          // Mint a new position with higher gas limit
-          setLiquidityTxStatus(prev => ({...prev, positionMinting: 'pending'}));
-          addLiquidityTx = await positionManager.mint(
-            mintParams,
-            {
+            console.log('Retry mint params:', {
+              token0,
+              token1,
+              fee,
+              tickLower: retryMinTick,
+              tickUpper: retryMaxTick,
+              amount0Desired: amount0Desired.toString(),
+              amount1Desired: amount1Desired.toString(),
+              amount0Min: retryAmount0Min.toString(),
+              amount1Min: retryAmount1Min.toString(),
+              recipient,
+              deadline
+            });
+            
+            const retryMintData = positionManager.interface.encodeFunctionData('mint', [retryMintParams]);
+            retryCalldata.push(retryMintData);
+            
+            // Execute multicall
+            console.log('Executing multicall with adjusted parameters');
+            const retryTxOptions = {
               value: ethValue,
-              gasLimit: 3000000 // Higher gas limit for complex operation
-            }
-          );
-          
-          console.log('Mint transaction sent:', addLiquidityTx.hash);
-        } catch (error) {
-          console.error('Error minting position:', error);
-          const mintErr = error as Error;
-          if (mintErr.message && mintErr.message.includes('tick')) {
-            // Try with adjusted ticks
-            console.log('Retrying with wider tick range...');
+              gasLimit: 15000000, // Increased gas limit even more
+            };
             
-            // Use even wider tick range
-            const widerMinTick = Math.floor(minTick * 0.9);
-            const widerMaxTick = Math.ceil(maxTick * 1.1);
-            
-            // Update mint params with wider tick range
-            mintParams.tickLower = widerMinTick;
-            mintParams.tickUpper = widerMaxTick;
-            
-            addLiquidityTx = await positionManager.mint(
-              mintParams,
-              {
-                value: ethValue,
-                gasLimit: 3000000
-              }
+            const retryTx = await positionManager.multicall(
+              retryCalldata,
+              retryTxOptions
             );
             
-            console.log('Mint transaction sent with adjusted ticks:', addLiquidityTx.hash);
+            addLiquidityTx = retryTx;
+            console.log('Retry multicall transaction sent:', retryTx.hash);
+            
+            // Wait for the transaction receipt to ensure it's successful
+            console.log('Waiting for retry transaction confirmation...');
+            const retryReceipt = await retryTx.wait();
+            console.log('Retry transaction confirmed, status:', retryReceipt.status);
+            
+            if (retryReceipt.status === 0) {
+              throw new Error('Retry transaction failed');
+            }
+            
+            // Look for IncreaseLiquidity event to extract the position ID
+            if (retryReceipt.logs) {
+              for (const log of retryReceipt.logs) {
+                try {
+                  // Try to find the Transfer event from NonfungiblePositionManager for the newly minted position
+                  if (log.address.toLowerCase() === positionManagerAddress.toLowerCase()) {
+                    const transferEventTopic = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'; // Transfer event topic
+                    if (log.topics[0].toLowerCase() === transferEventTopic && log.topics[1].toLowerCase() === '0x0000000000000000000000000000000000000000000000000000000000000000') {
+                      // Found a Transfer from address 0, which is a mint event
+                      // topic[3] contains the tokenId
+                      const tokenId = ethers.toBigInt(log.topics[3]);
+                      console.log('Created position with ID (retry):', tokenId.toString());
+                    }
+                  }
+                } catch (err) {
+                  console.error('Error parsing retry log:', err);
+                }
+              }
+            }
+            
+            setLiquidityTxStatus(prev => ({...prev, poolCreation: 'complete', positionMinting: 'complete'}));
           } else {
-            throw error; // Re-throw other errors
+            throw err; // Re-throw other errors
           }
         }
       } else {
@@ -3635,3 +3790,8 @@ export default function ContractDeploy() {
     </AppLayout>
   );
 }
+
+const TickMath = {
+  MIN_TICK: -887272,
+  MAX_TICK: 887272
+};

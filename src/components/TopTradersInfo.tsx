@@ -70,6 +70,7 @@ const formatTagText = (tag: string): string => {
   if (tag === 'transfer_in') return 'Transfer In';
   if (tag === 'is_new' || tag === 'new_wallet') return 'New Wallet';
   if (tag === 'suspicious') return 'Suspicious';
+  if (tag === 'smart_degen') return 'Smart Wallet';
   
   // General formatting for other tags - capitalize words and replace underscores with spaces
   return tag

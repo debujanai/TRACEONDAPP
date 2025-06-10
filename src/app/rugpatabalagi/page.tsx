@@ -12,6 +12,11 @@ import GoPlusSecurityInfo from '@/components/GoPlusSecurityInfo';
 import SolanaSecurityInfo from '@/components/SolanaSecurityInfo';
 import Image from 'next/image';
 
+// Custom image loader to handle external URLs
+const imageLoader = ({ src }: { src: string }) => {
+  return src;
+};
+
 type TabType = 'overview' | 'risk' | 'holders' | 'liquidity' | 'past_rugs';
 
 interface TabProps {
@@ -983,19 +988,26 @@ export default function RugTrace() {
                                   {tokenData.rug_analysis.data.data.rug.rugged_tokens.map((token, index) => (
                                     <div key={index} className="bg-black/40 rounded-lg p-3 border border-white/10">
                                       <div className="flex items-center gap-3">
-                                        {token.logo && (
+                                        {token.logo ? (
                                           <Image 
                                             src={token.logo} 
                                             alt={token.name} 
                                             className="w-8 h-8 rounded-full"
                                             width={32}
                                             height={32}
+                                            unoptimized={true}
+                                            loader={imageLoader}
+                                            loading="eager"
                                             onError={(e) => {
                                               // Replace broken image with placeholder
                                               const target = e.target as HTMLImageElement;
                                               target.src = 'https://placehold.co/32x32/gray/white?text=?';
                                             }}
                                           />
+                                        ) : (
+                                          <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-white text-xs">
+                                            {token.symbol ? token.symbol.charAt(0) : '?'}
+                                          </div>
                                         )}
                                         <div className="overflow-hidden">
                                           <p className="font-medium text-sm truncate">{token.name}</p>

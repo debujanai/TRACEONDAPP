@@ -382,9 +382,9 @@ export default function TokenSecurity() {
               whileTap={{ scale: 0.98 }}
             >
               <option value="1">Ethereum</option>
-              <option value="56">BSC</option>
+              {/* <option value="56">BSC</option>
               <option value="137">Polygon</option>
-              <option value="42161">Arbitrum</option>
+              <option value="42161">Arbitrum</option> */}
             </motion.select>
             <motion.button 
               type="submit" 

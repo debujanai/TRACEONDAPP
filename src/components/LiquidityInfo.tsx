@@ -32,7 +32,7 @@ interface LiquidityInfoProps {
 }
 
 const LiquidityInfo: React.FC<LiquidityInfoProps> = ({ data }) => {
-  // Calculate liquidity health score (simplified version)
+  // Calculate liquidity health score (improved version)
   const isLiquidityLocked = data.security.lock_summary?.is_locked || false;
   const lockPercentage = data.security.lock_summary?.lock_percent || '0';
   
@@ -46,42 +46,73 @@ const LiquidityInfo: React.FC<LiquidityInfoProps> = ({ data }) => {
   const buyTax = parseFloat(data.security.buy_tax || '0');
   const sellTax = parseFloat(data.security.sell_tax || '0');
 
-  // Calculate health score: 0-100
+  // Calculate health score: 0-100 with improved weighting
   let liquidityHealthScore = 0;
   
-  // If liquidity is locked, add up to 50 points based on lock percentage
-  if (isLiquidityLocked) {
-    const lockPercentageNum = parseFloat(lockPercentage);
-    liquidityHealthScore += Math.min(50, lockPercentageNum / 2);
-  }
+  // Convert lock percentage to a number between 0-100
+  const lockPercentageNum = parseFloat(lockPercentage);
+  const normalizedLockPercentage = lockPercentageNum <= 1 ? lockPercentageNum * 100 : lockPercentageNum;
   
-  // If top holder rate is less than 50%, add points (less concentration is better)
-  // Use the proper percentage value for calculation
+  // Convert top holder rate to a percentage between 0-100
   const topHolderRatePercent = topHolderRateNum <= 1 ? topHolderRateNum * 100 : topHolderRateNum;
-  if (topHolderRatePercent <= 50) {
-    liquidityHealthScore += 30;
-  } else if (topHolderRatePercent <= 70) {
-    liquidityHealthScore += 15;
+  
+  // 1. Liquidity Lock Score (0-40 points)
+  if (isLiquidityLocked) {
+    // Scale points based on lock percentage: 0% locked = 0 points, 100% locked = 40 points
+    liquidityHealthScore += Math.min(40, normalizedLockPercentage * 0.4);
   }
   
-  // If taxes are reasonable (less than 10%), add points
-  if (buyTax <= 10 && sellTax <= 10) {
-    liquidityHealthScore += 20;
-  } else if (buyTax <= 15 && sellTax <= 15) {
-    liquidityHealthScore += 10;
+  // 2. Holder Concentration Score (0-35 points)
+  // Lower concentration (lower top holder rate) is better
+  if (topHolderRatePercent <= 20) {
+    liquidityHealthScore += 35; // Excellent distribution
+  } else if (topHolderRatePercent <= 40) {
+    liquidityHealthScore += 28; // Very good distribution
+  } else if (topHolderRatePercent <= 60) {
+    liquidityHealthScore += 21; // Good distribution
+  } else if (topHolderRatePercent <= 80) {
+    liquidityHealthScore += 14; // Concerning concentration
+  } else {
+    liquidityHealthScore += 7; // High concentration risk
   }
+  
+  // 3. Tax Structure Score (0-25 points)
+  // Calculate average tax
+  const avgTax = (buyTax + sellTax) / 2;
+  
+  if (avgTax <= 1) {
+    liquidityHealthScore += 25; // Excellent tax structure
+  } else if (avgTax <= 3) {
+    liquidityHealthScore += 20; // Very good tax structure
+  } else if (avgTax <= 5) {
+    liquidityHealthScore += 15; // Good tax structure
+  } else if (avgTax <= 10) {
+    liquidityHealthScore += 10; // Moderate tax structure
+  } else if (avgTax <= 15) {
+    liquidityHealthScore += 5; // High tax structure
+  } // 0 points for extremely high taxes
   
   // Round the score
   liquidityHealthScore = Math.round(liquidityHealthScore);
   
   // Determine status based on score
   const getLiquidityStatus = () => {
-    if (liquidityHealthScore >= 70) return { text: 'Good Liquidity', color: 'green' };
-    if (liquidityHealthScore >= 40) return { text: 'Moderate', color: 'orange' };
+    if (liquidityHealthScore >= 80) return { text: 'Excellent', color: 'green' };
+    if (liquidityHealthScore >= 65) return { text: 'Good', color: 'green' };
+    if (liquidityHealthScore >= 50) return { text: 'Moderate', color: 'orange' };
+    if (liquidityHealthScore >= 30) return { text: 'Risky', color: 'orange' };
     return { text: 'High Risk', color: 'red' };
   };
   
   const status = getLiquidityStatus();
+
+  // For lockPercentage display
+  const getFormattedPercentage = (value: string | number) => {
+    const num = typeof value === 'string' ? parseFloat(value) : value;
+    if (isNaN(num)) return '0%';
+    const percent = num <= 1 ? num * 100 : num;
+    return `${percent % 1 === 0 ? percent : percent.toFixed(2)}`.replace(/\.00$/, '') + '%';
+  };
 
   return (
     <div className="space-y-6">
@@ -187,7 +218,7 @@ const LiquidityInfo: React.FC<LiquidityInfoProps> = ({ data }) => {
               Lock Percentage
             </h3>
             <div className="text-xl font-medium">
-              {lockPercentage || '0%'}
+              {getFormattedPercentage(lockPercentage)}
             </div>
           </div>
         </div>
@@ -207,7 +238,7 @@ const LiquidityInfo: React.FC<LiquidityInfoProps> = ({ data }) => {
                       )}
                     </div>
                     <div className="flex flex-col items-end">
-                      <div className="text-sm font-medium">{holder.percent}%</div>
+                      <div className="text-sm font-medium">{getFormattedPercentage(holder.percent)}</div>
                       {holder.is_locked === 1 && (
                         <div className="text-xs text-green-400">Locked</div>
                       )}

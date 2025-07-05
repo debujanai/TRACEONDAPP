@@ -24,20 +24,20 @@ const ProductCarousel = () => {
         </svg>
       )
     },
-    {
-      id: "launchlite",
-      title: "LaunchLite",
-      category: "Deploy Custom Tokens",
-      description: "Deploy custom ERC20 tokens with advanced features using our secure, audited templates and deployment tools. Our streamlined platform enables you to customize token parameters, implement vesting schedules, and deploy with confidence to any EVM-compatible blockchain.",
-      accent: "#4ade80", // Green
-      tags: ['ERC20', 'Custom Tokens', 'Gas Optimized', 'Multi-Chain', 'Secure Templates'],
-      icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-          <polyline points="22 4 12 14.01 9 11.01"></polyline>
-        </svg>
-      )
-    },
+    // {
+    //   id: "launchlite",
+    //   title: "LaunchLite",
+    //   category: "Deploy Custom Tokens",
+    //   description: "Deploy custom ERC20 tokens with advanced features using our secure, audited templates and deployment tools. Our streamlined platform enables you to customize token parameters, implement vesting schedules, and deploy with confidence to any EVM-compatible blockchain.",
+    //   accent: "#4ade80", // Green
+    //   tags: ['ERC20', 'Custom Tokens', 'Gas Optimized', 'Multi-Chain', 'Secure Templates'],
+    //   icon: (
+    //     <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    //       <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+    //       <polyline points="22 4 12 14.01 9 11.01"></polyline>
+    //     </svg>
+    //   )
+    // },
     {
       id: "rugtrace",
       title: "RugTrace",

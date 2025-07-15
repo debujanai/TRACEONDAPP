@@ -407,7 +407,7 @@ export default function PhishTrace() {
     }
 
     const results = scanData.data.attributes.last_analysis_results;
-    let counts = {
+    const counts = {
       malicious: 0,
       suspicious: 0,
       harmless: 0,

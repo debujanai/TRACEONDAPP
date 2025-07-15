@@ -191,8 +191,6 @@ export default function PhishTrace() {
   const toBase64 = (str: string): string => {
     // Convert to base64 and remove padding characters (=)
     const base64 = Buffer.from(str).toString('base64').replace(/=/g, '');
-    console.log('Original URL:', str);
-    console.log('Base64 URL:', base64);
     return base64;
   };
 
@@ -249,7 +247,6 @@ export default function PhishTrace() {
           'phish_trace'
         );
       } catch (historyError) {
-        console.error('Error saving search to history:', historyError);
         // Continue with the search even if logging fails
       }
     }
@@ -264,11 +261,10 @@ export default function PhishTrace() {
     try {
       // Convert URL to base64
       const base64Url = toBase64(url);
-      console.log('Sending base64 URL to API:', base64Url);
 
       // Call APIs in parallel
       const [scanResponse, domainResponse] = await Promise.all([
-        // VirusTotal API
+        // Security scan API
         fetch('/api/phishtrace', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -287,11 +283,8 @@ export default function PhishTrace() {
         domainResponse.json()
       ]);
       
-      console.log('API Scan Response:', scanDataResult);
-      console.log('API Domain Response:', domainDataResult);
-      
       if (!scanResponse.ok) {
-        throw new Error(scanDataResult.error || 'Failed to fetch URL scan data');
+        throw new Error('Unable to complete security scan. Please try again.');
       }
       
       setScanData(scanDataResult);
@@ -302,9 +295,7 @@ export default function PhishTrace() {
         loadScreenshot();
       }
     } catch (err: unknown) {
-      const error = err as ApiError;
-      setError(error.message || 'An error occurred');
-      console.error('Error fetching URL scan data:', error);
+      setError('Unable to analyze the URL at this time. Please try again later.');
     } finally {
       setLoading(false);
     }
@@ -317,7 +308,7 @@ export default function PhishTrace() {
     }
   }, [activeTab, scanData]);
 
-  // Function to load screenshot using Microlink API
+  // Function to load screenshot
   const loadScreenshot = async () => {
     if (!url || screenshotLoading) return;
     
@@ -334,14 +325,12 @@ export default function PhishTrace() {
       const data = await response.json();
       
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to generate screenshot');
+        throw new Error('Unable to generate screenshot at this time.');
       }
       
       setScreenshotData(data.screenshot);
     } catch (err: unknown) {
-      const error = err as ApiError;
-      setScreenshotError(error.message || 'Failed to generate screenshot');
-      console.error('Error generating screenshot:', error);
+      setScreenshotError('Unable to generate screenshot at this time. Please try again.');
     } finally {
       setScreenshotLoading(false);
     }

@@ -76,9 +76,35 @@ export const getOrCreateProfile = async (walletAddress: string): Promise<UserPro
       .eq('wallet_address', normalizedAddress)
       .single();
       
-    // If profile exists, return it
+    // If profile exists, check if it's a placeholder and upgrade it
     if (existingProfile) {
       console.log('Found existing profile:', existingProfile);
+      
+      // If this is a placeholder profile (0 credits), upgrade it to a full profile
+      if (existingProfile.credits === 0) {
+        console.log('Upgrading placeholder profile to full profile');
+        
+        const upgradedProfileData = {
+          name: 'User', // Give them a proper default name
+          credits: 100 // Give them the standard credits
+        };
+        
+        const { data: upgradedProfile, error: upgradeError } = await supabase
+          .from('profiles')
+          .update(upgradedProfileData)
+          .eq('wallet_address', normalizedAddress)
+          .select()
+          .single();
+          
+        if (upgradeError) {
+          console.error('Error upgrading placeholder profile:', upgradeError);
+          return existingProfile as UserProfile; // Return original if upgrade fails
+        }
+        
+        console.log('Successfully upgraded placeholder profile:', upgradedProfile);
+        return upgradedProfile as UserProfile;
+      }
+      
       return existingProfile as UserProfile;
     }
     
